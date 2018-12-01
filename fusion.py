@@ -52,33 +52,31 @@ def gaussian_pyramid(img, depth):
 
 def laplacian_pyramid(gPyr):
     lPyr = []
-    for i in range(1, len(gPyr)):
-        up = cv2.pyrUp(gPyr[i]).astype(np.float32)
-        if up.shape[0] > gPyr[i - 1].shape[0]:
-            up = np.delete(up, (-1), axis=0)
-        if up.shape[1] > gPyr[i - 1].shape[1]:
-            up = np.delete(up, (-1), axis=1)
-        laplacian = cv2.subtract(gPyr[i - 1], up)
+    for i in range(len(gPyr) - 1):
+        expanded = cv2.pyrUp(gPyr[i + 1]).astype(np.float32)
+        if expanded.shape[0] > gPyr[i].shape[0]:
+            expanded = np.delete(expanded, 0, axis=0)
+        if expanded.shape[1] > gPyr[i].shape[1]:
+            expanded = np.delete(expanded, 0, axis=1)
+        laplacian = cv2.subtract(gPyr[i], expanded)
         lPyr.append(laplacian)
 
     lPyr.append(gPyr[-1])
     return lPyr
 
 
-def collapse(pyr):
-    collapsed = pyr[len(pyr) - 1]
+def collapse(lPyr):
+    collapsed = lPyr[len(lPyr) - 1]
 
-    for pyr_slice in xrange(len(pyr) - 1, 0, -1):
-        expanded = expand_layer(collapsed)
+    for i in range(len(lPyr) - 1, 0, -1):
+        expanded = cv2.pyrUp(collapsed).astype(np.float32)
 
-        adding_layer = pyr[pyr_slice - 1]
-
-        while expanded.shape[0] != adding_layer.shape[0]:  # rows need to match
+        if expanded.shape[0] > lPyr[i - 1].shape[0]:
             expanded = np.delete(expanded, 0, axis=0)
-        while expanded.shape[1] != adding_layer.shape[1]:  # columns need to match
+        if expanded.shape[1] > lPyr[i - 1].shape[1]:
             expanded = np.delete(expanded, 0, axis=1)
 
-        collapsed = expanded + pyr[pyr_slice - 1]
+        collapsed = expanded + lPyr[i - 1]
 
     return collapsed
 
@@ -86,7 +84,7 @@ def collapse(pyr):
 def exposure_fusion(img_stack):
     img_stack = np.array(img_stack).astype(np.float32)
     weights = get_weights(img_stack)
-    r = np.empty([img_stack[0].shape[0], img_stack[0].shape[1], img_stack.shape[3]])
+    # r = np.empty([img_stack[0].shape[0], img_stack[0].shape[1], img_stack.shape[3]])
     # for i in range(img_stack.shape[3]):
     #     r[:, :, i] = np.sum(weights * img_stack[:, :, :, i], axis=0)
 
@@ -122,4 +120,6 @@ def exposure_fusion(img_stack):
 
         lpR.append(sum)
 
-    return r.astype(np.uint8)
+    # Collapse pyramid
+    output = collapse(lpR)
+    return output.astype(np.uint8)
