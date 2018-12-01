@@ -107,20 +107,19 @@ def exposure_fusion(img_stack):
 
     # Multiply and Sum for output Laplacian
     lpR = []
-    for i in range(img_stack.shape[0]):
-        # Multiply across 3 channels in each Laplacian
-        gaussians = gps[i]
-        laplacians = lpIs[i]
+    for l in range(depth):
+        sum = []
+        # for each image
+        for k in range(img_stack.shape[0]):
+            gaussian = gps[k][l]
+            laplacian = lpIs[k][l]
+            channel = np.empty_like(laplacian)
+            # for each color channel
+            for c in range(3):
+                channel[:, :, c] = gaussian * laplacian[:, :, c]
 
-        # for j in list of gaussians/laplacians
-        for j in range(len(gaussians)):
-            prod = np.empty_like(laplacians[j])
-            for k in range(3):
-                # print 'i: ' + str(i) + ' j: ' + str(j) + ' k: ' + str(k)
-                gaussian = gaussians[j]
-                laplacian = laplacians[j]
-                prod[:, :, k] = gaussian * laplacian[:, :, k]
+            sum = channel
 
-        lpR.append(prod)
+        lpR.append(sum)
 
     return r.astype(np.uint8)
