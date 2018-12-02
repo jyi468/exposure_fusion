@@ -65,6 +65,27 @@ def laplacian_pyramid(gPyr):
     return lPyr
 
 
+def create_final_laplacian(gps, lps, depth, img_stack):
+    # Multiply and Sum for output Laplacian
+    lpR = []
+    for l in range(depth):
+        summed = None
+        # for each image
+        for k in range(img_stack.shape[0]):
+            gaussian = gps[k][l]
+            laplacian = lps[k][l]
+            channel = np.empty_like(laplacian)
+            # for each color channel
+            for c in range(3):
+                channel[:, :, c] = gaussian * laplacian[:, :, c]
+
+            summed = channel
+
+        lpR.append(summed)
+
+    return lpR
+
+
 def collapse(lPyr):
     collapsed = lPyr[len(lPyr) - 1]
 
@@ -84,10 +105,6 @@ def collapse(lPyr):
 def exposure_fusion(img_stack):
     img_stack = np.array(img_stack).astype(np.float32)
     weights = get_weights(img_stack)
-    # r = np.empty([img_stack[0].shape[0], img_stack[0].shape[1], img_stack.shape[3]])
-    # for i in range(img_stack.shape[3]):
-    #     r[:, :, i] = np.sum(weights * img_stack[:, :, :, i], axis=0)
-
     depth = int(np.log2(min(img_stack[0].shape[:2])))
 
     gps = []
@@ -96,30 +113,14 @@ def exposure_fusion(img_stack):
         gpW = gaussian_pyramid(weights[i], depth)
         gps.append(gpW)
 
-    lpIs = []
+    lps = []
     # Get Laplacian pyramid of for each image
     for i in range(img_stack.shape[0]):
         gpI = gaussian_pyramid(img_stack[i, :, :, :], depth)
         lpI = laplacian_pyramid(gpI)
-        lpIs.append(lpI)
+        lps.append(lpI)
 
-    # Multiply and Sum for output Laplacian
-    lpR = []
-    for l in range(depth):
-        sum = []
-        # for each image
-        for k in range(img_stack.shape[0]):
-            gaussian = gps[k][l]
-            laplacian = lpIs[k][l]
-            channel = np.empty_like(laplacian)
-            # for each color channel
-            for c in range(3):
-                channel[:, :, c] = gaussian * laplacian[:, :, c]
-
-            sum = channel
-
-        lpR.append(sum)
-
+    lpR = create_final_laplacian(gps, lps, depth, img_stack)
     # Collapse pyramid
     output = collapse(lpR)
     return output.astype(np.uint8)
