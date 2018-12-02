@@ -16,7 +16,7 @@ def get_weights(img_stack):
     sum_w = np.sum(weights, axis=0)
     weights = np.divide(weights, sum_w, where=sum_w != 0)
 
-    return weights
+    return (weights * 255).astype(np.uint8)
 
 
 def contrast(img, w_c=1):
@@ -40,42 +40,44 @@ def gaussian_pyramid(img, depth):
     reduced = img.copy()
     pyr = [reduced]
     for i in range(depth):
-        reduced = cv2.pyrDown(reduced).astype(np.float32)
+        reduced = cv2.pyrDown(reduced)
         pyr.append(reduced)
 
     return pyr
 
 
 def laplacian_pyramid(gPyr):
-    lPyr = []
-    for i in range(len(gPyr) - 1):
-        expanded = cv2.pyrUp(gPyr[i + 1]).astype(np.float32)
-        if expanded.shape[0] > gPyr[i].shape[0]:
+    lPyr = [gPyr[-1]]
+    for i in range(len(gPyr) - 1, 0, -1):
+        expanded = cv2.pyrUp(gPyr[i])
+        if expanded.shape[0] > gPyr[i - 1].shape[0]:
             expanded = np.delete(expanded, 0, axis=0)
-        if expanded.shape[1] > gPyr[i].shape[1]:
+        if expanded.shape[1] > gPyr[i - 1].shape[1]:
             expanded = np.delete(expanded, 0, axis=1)
-        laplacian = cv2.subtract(gPyr[i], expanded)
-        lPyr.append(laplacian)
+        laplacian = cv2.subtract(gPyr[i - 1], expanded)
+        lPyr = [laplacian] + lPyr
 
-    lPyr.append(gPyr[-1])
     return lPyr
 
 
 def create_final_laplacian(gPyrs, lPyrs, depth, img_stack):
     # Multiply and Sum for output Laplacian
     lpR = []
+    # for each gaussian/laplacian
     for l in range(depth):
         summed = None
         # for each image
         for k in range(img_stack.shape[0]):
-            gaussian = gPyrs[k][l]
+            gaussian = gPyrs[k][l].astype(np.float32) / 255
             laplacian = lPyrs[k][l]
             channel = np.empty_like(laplacian)
             # for each color channel
             for c in range(3):
                 channel[:, :, c] = gaussian * laplacian[:, :, c]
+            gaussian = np.dstack((gaussian, gaussian, gaussian))
+            summed = cv2.multiply(gaussian, laplacian, dtype=cv2.CV_8UC3)
 
-            summed = channel
+            # summed = channel
 
         lpR.append(summed)
 
@@ -86,7 +88,7 @@ def collapse(lPyr):
     collapsed = lPyr[len(lPyr) - 1]
 
     for i in range(len(lPyr) - 1, 0, -1):
-        expanded = cv2.pyrUp(collapsed).astype(np.float32)
+        expanded = cv2.pyrUp(collapsed)
 
         if expanded.shape[0] > lPyr[i - 1].shape[0]:
             expanded = np.delete(expanded, 0, axis=0)
@@ -100,14 +102,18 @@ def collapse(lPyr):
 
 def exposure_fusion(img_stack):
     img_stack = np.array(img_stack).astype(np.float32)
+    # weights = compute_weights(img_stack, None)
     weights = get_weights(img_stack)
-    depth = int(np.log2(min(img_stack[0].shape[:2])))
-
+    depth = int(np.log2(min(img_stack[0].shape[:2]))) - 5
+    # # Weights only
     # r = np.empty([img_stack[0].shape[0], img_stack[0].shape[1], img_stack.shape[3]])
     # # For each channel
     # for i in range(img_stack.shape[3]):
     #     r[:, :, i] = np.sum(weights * img_stack[:, :, :, i], axis=0)
 
+    # return r
+
+    # All
     gPyrs = []
     # Gaussian of weights
     for i in range(weights.shape[0]):
@@ -125,5 +131,4 @@ def exposure_fusion(img_stack):
 
     # Collapse pyramid
     output = collapse(lpR)
-    return output.astype(np.uint8)
-    # return r
+    return output
