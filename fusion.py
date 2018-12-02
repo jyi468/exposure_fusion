@@ -36,20 +36,41 @@ def exposedness(img, w_e=1, sigma=0.2):
     return np.prod(np.exp(-((img - 0.5) ** 2 / (2 * sigma ** 2))), axis=2, dtype=np.float32) ** w_e + 1
 
 
+def gaussian_kernel(size=5, sigma=0.4):
+    return cv2.getGaussianKernel(ksize=size, sigma=sigma)
+
+
+def image_reduce(image):
+    kernel = gaussian_kernel()
+    if len(image.shape) == 3:
+        out_image = cv2.filter2D(image, cv2.CV_8UC3, kernel)
+    else:
+        out_image = cv2.filter2D(image, cv2.CV_8U, kernel)
+    out_image = cv2.resize(out_image, None, fx=0.5, fy=0.5)
+    return out_image
+
+
+def image_expand(image):
+    kernel = gaussian_kernel()
+    out_image = cv2.resize(image, None, fx=2, fy=2)
+    out_image = cv2.filter2D(out_image, cv2.CV_8UC3, kernel)
+    return out_image
+
+
 def gaussian_pyramid(img, depth):
     reduced = img.copy()
     pyr = [reduced]
     for i in range(depth):
-        reduced = cv2.pyrDown(reduced)
+        reduced = image_reduce(reduced)
         pyr.append(reduced)
 
     return pyr
 
 
 def laplacian_pyramid(gPyr):
-    lPyr = [gPyr[-1]]
-    for i in range(len(gPyr) - 1, 0, -1):
-        expanded = cv2.pyrUp(gPyr[i])
+    lPyr = [gPyr[-3]]
+    for i in range(len(gPyr) - 3, 0, -1):
+        expanded = image_expand(gPyr[i])
         if expanded.shape[0] > gPyr[i - 1].shape[0]:
             expanded = np.delete(expanded, 0, axis=0)
         if expanded.shape[1] > gPyr[i - 1].shape[1]:
@@ -88,7 +109,7 @@ def collapse(lPyr):
     collapsed = lPyr[len(lPyr) - 1]
 
     for i in range(len(lPyr) - 1, 0, -1):
-        expanded = cv2.pyrUp(collapsed)
+        expanded = image_expand(collapsed)
 
         if expanded.shape[0] > lPyr[i - 1].shape[0]:
             expanded = np.delete(expanded, 0, axis=0)
@@ -101,10 +122,11 @@ def collapse(lPyr):
 
 
 def exposure_fusion(img_stack):
-    img_stack = np.array(img_stack).astype(np.float32)
+    img_stack = np.array(img_stack)
     # weights = compute_weights(img_stack, None)
     weights = get_weights(img_stack)
-    depth = int(np.log2(min(img_stack[0].shape[:2]))) - 5
+    # depth = int(np.log2(min(img_stack[0].shape[:2]))) - 5
+    depth = 4
     # # Weights only
     # r = np.empty([img_stack[0].shape[0], img_stack[0].shape[1], img_stack.shape[3]])
     # # For each channel
@@ -123,7 +145,7 @@ def exposure_fusion(img_stack):
     lPyrs = []
     # Get Laplacian pyramid of for each image
     for i in range(img_stack.shape[0]):
-        gpI = gaussian_pyramid(img_stack[i, :, :, :], depth)
+        gpI = gaussian_pyramid(img_stack[i, :, :, :], depth + 1)
         lpI = laplacian_pyramid(gpI)
         lPyrs.append(lpI)
 
