@@ -39,29 +39,29 @@ def exposedness(img, w_e=1, sigma=0.2):
 def gaussian_kernel(size=5, sigma=0.4):
     return cv2.getGaussianKernel(ksize=size, sigma=sigma)
 
-
-def image_reduce(image):
-    kernel = gaussian_kernel()
-    if len(image.shape) == 3:
-        out_image = cv2.filter2D(image, cv2.CV_8UC3, kernel)
-    else:
-        out_image = cv2.filter2D(image, cv2.CV_8U, kernel)
-    out_image = cv2.resize(out_image, None, fx=0.5, fy=0.5)
-    return out_image
-
-
-def image_expand(image):
-    kernel = gaussian_kernel()
-    out_image = cv2.resize(image, None, fx=2, fy=2)
-    out_image = cv2.filter2D(out_image, cv2.CV_8UC3, kernel)
-    return out_image
+#
+# def cv2.pyrDown(image):
+#     kernel = gaussian_kernel()
+#     if len(image.shape) == 3:
+#         out_image = cv2.filter2D(image, cv2.CV_8UC3, kernel)
+#     else:
+#         out_image = cv2.filter2D(image, cv2.CV_8U, kernel)
+#     out_image = cv2.resize(out_image, None, fx=0.5, fy=0.5)
+#     return out_image
+#
+#
+# def cv2.pyrUp(image):
+#     kernel = gaussian_kernel()
+#     out_image = cv2.resize(image, None, fx=2, fy=2)
+#     out_image = cv2.filter2D(out_image, cv2.CV_8UC3, kernel)
+#     return out_image
 
 
 def gaussian_pyramid(img, depth):
     reduced = img.copy()
     pyr = [reduced]
     for i in range(depth):
-        reduced = image_reduce(reduced)
+        reduced = cv2.pyrDown(reduced)
         pyr.append(reduced)
 
     return pyr
@@ -70,7 +70,7 @@ def gaussian_pyramid(img, depth):
 def laplacian_pyramid(gPyr):
     lPyr = [gPyr[-3]]
     for i in range(len(gPyr) - 3, 0, -1):
-        expanded = image_expand(gPyr[i])
+        expanded = cv2.pyrUp(gPyr[i])
         if expanded.shape[0] > gPyr[i - 1].shape[0]:
             expanded = np.delete(expanded, 0, axis=0)
         if expanded.shape[1] > gPyr[i - 1].shape[1]:
@@ -109,7 +109,7 @@ def collapse(lPyr):
     collapsed = lPyr[len(lPyr) - 1]
 
     for i in range(len(lPyr) - 1, 0, -1):
-        expanded = image_expand(collapsed)
+        expanded = cv2.pyrUp(collapsed)
 
         if expanded.shape[0] > lPyr[i - 1].shape[0]:
             expanded = np.delete(expanded, 0, axis=0)

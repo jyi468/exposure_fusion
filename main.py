@@ -5,7 +5,7 @@ from os import path
 import os
 import errno
 
-SRC_FOLDER = "images/source/peyrou"
+SRC_FOLDER = "images/source/custom"
 OUT_FOLDER = "images/output"
 EXTENSIONS = set(["bmp", "jpeg", "jpg", "png", "tif", "tiff"])
 
