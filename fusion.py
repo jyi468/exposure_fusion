@@ -1,9 +1,5 @@
-# from __future__ import division
 import numpy as np
 import cv2
-import math
-import scipy as sp
-from matplotlib import pyplot as plt
 
 
 def get_weights(img_stack):
@@ -26,26 +22,26 @@ def get_weights(img_stack):
 def contrast(img, w_c=1):
     """Contrast is determined by absolute value of laplacian"""
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    return np.absolute(cv2.Laplacian(gray, cv2.CV_32F)) ** w_c
+    return np.absolute(cv2.Laplacian(gray, cv2.CV_32F)) ** w_c + 1
 
 
 def saturation(img, w_s=1):
     """Saturation is standard deviation within the RGB Channels"""
-    return np.std(img, axis=2, dtype=np.float32) ** w_s
+    return np.std(img, axis=2, dtype=np.float32) ** w_s + 1
 
 
 def exposedness(img, w_e=1, sigma=0.2):
     """Well-exposedness is raw pixel intensities of a channel."""
     # Calculate values for each element and then multiply across channels
-    return np.prod(np.exp(-((img - 0.5) ** 2 / (2 * sigma ** 2))), axis=2, dtype=np.float32) ** w_e
+    return np.prod(np.exp(-((img - 0.5) ** 2 / (2 * sigma ** 2))), axis=2, dtype=np.float32) ** w_e + 1
 
 
 def gaussian_pyramid(img, depth):
-    down = img.copy()
-    pyr = [down]
+    reduced = img.copy()
+    pyr = [reduced]
     for i in range(depth):
-        down = cv2.pyrDown(down).astype(np.float32)
-        pyr.append(down)
+        reduced = cv2.pyrDown(reduced).astype(np.float32)
+        pyr.append(reduced)
 
     return pyr
 
@@ -65,15 +61,15 @@ def laplacian_pyramid(gPyr):
     return lPyr
 
 
-def create_final_laplacian(gps, lps, depth, img_stack):
+def create_final_laplacian(gPyrs, lPyrs, depth, img_stack):
     # Multiply and Sum for output Laplacian
     lpR = []
     for l in range(depth):
         summed = None
         # for each image
         for k in range(img_stack.shape[0]):
-            gaussian = gps[k][l]
-            laplacian = lps[k][l]
+            gaussian = gPyrs[k][l]
+            laplacian = lPyrs[k][l]
             channel = np.empty_like(laplacian)
             # for each color channel
             for c in range(3):
@@ -107,20 +103,27 @@ def exposure_fusion(img_stack):
     weights = get_weights(img_stack)
     depth = int(np.log2(min(img_stack[0].shape[:2])))
 
-    gps = []
+    # r = np.empty([img_stack[0].shape[0], img_stack[0].shape[1], img_stack.shape[3]])
+    # # For each channel
+    # for i in range(img_stack.shape[3]):
+    #     r[:, :, i] = np.sum(weights * img_stack[:, :, :, i], axis=0)
+
+    gPyrs = []
     # Gaussian of weights
     for i in range(weights.shape[0]):
         gpW = gaussian_pyramid(weights[i], depth)
-        gps.append(gpW)
+        gPyrs.append(gpW)
 
-    lps = []
+    lPyrs = []
     # Get Laplacian pyramid of for each image
     for i in range(img_stack.shape[0]):
         gpI = gaussian_pyramid(img_stack[i, :, :, :], depth)
         lpI = laplacian_pyramid(gpI)
-        lps.append(lpI)
+        lPyrs.append(lpI)
 
-    lpR = create_final_laplacian(gps, lps, depth, img_stack)
+    lpR = create_final_laplacian(gPyrs, lPyrs, depth, img_stack)
+
     # Collapse pyramid
     output = collapse(lpR)
     return output.astype(np.uint8)
+    # return r
