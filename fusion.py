@@ -86,7 +86,7 @@ def create_final_laplacian(gPyrs, lPyrs, depth, img_stack):
     lpR = []
     # for each gaussian/laplacian
     for l in range(depth):
-        summed = None
+        summed = np.zeros(lPyrs[0][l].shape, dtype=np.uint8)
         # for each image
         for k in range(img_stack.shape[0]):
             gaussian = gPyrs[k][l].astype(np.float32) / 255
@@ -96,7 +96,7 @@ def create_final_laplacian(gPyrs, lPyrs, depth, img_stack):
             for c in range(3):
                 channel[:, :, c] = gaussian * laplacian[:, :, c]
             gaussian = np.dstack((gaussian, gaussian, gaussian))
-            summed = cv2.multiply(gaussian, laplacian, dtype=cv2.CV_8UC3)
+            summed += cv2.multiply(gaussian, laplacian, dtype=cv2.CV_8UC3)
 
             # summed = channel
 
